@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini AI 챗봇</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        #realNameFields { display: none; padding: 10px; background: #f5f5f5; border-radius: 5px; margin-top: 10px;}
+        input[type="text"], input[type="email"], textarea { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 5px; }
+        textarea { height: 100px; resize: vertical; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+        #chatLog { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .message { margin-bottom: 15px; padding: 15px; border-radius: 8px; background: #f9f9f9; }
+        .question-text { font-weight: bold; color: #333; margin-bottom: 8px; }
+        .answer-text { color: #555; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+
+    <h2>챗봇에게 질문하기</h2>
+
+    <div class="form-group">
+        <label><input type="radio" name="userType" value="anon" checked onclick="toggleFields()"> 익명</label>
+        <label><input type="radio" name="userType" value="real" onclick="toggleFields()"> 실명</label>
+    </div>
+
+    <div id="realNameFields" class="form-group">
+        <label>이름: <input type="text" id="userName" placeholder="이름을 입력하세요"></label><br><br>
+        <label>이메일: <input type="email" id="userEmail" placeholder="이메일을 입력하세요"></label>
+    </div>
+
+    <div class="form-group">
+        <label>질문: <textarea id="questionInput" placeholder="무엇이든 물어보세요!"></textarea></label>
+    </div>
+
+    <button id="submitBtn" onclick="askGemini()">질문하기</button>
+
+    <div id="chatLog"></div>
+
+    <script>
+        // 새로 발급받으신 구글 시트 웹 앱 URL 적용 완료!
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbySE3lTPS33ymF9077XIoTXKyVJmxPszg6YX_2nOU26meGoho4bBD1u61SxK_xjW-UyIg/exec"; 
+
+        function toggleFields() {
+            const isRealName = document.querySelector('input[name="userType"]:checked').value === "real";
+            document.getElementById("realNameFields").style.display = isRealName ? "block" : "none";
+        }
+
+        async function askGemini() {
+            const questionInput = document.getElementById("questionInput");
+            const btn = document.getElementById("submitBtn");
+            const question = questionInput.value.trim();
+            
+            if (!question) {
+                alert("질문을 입력해주세요.");
+                return;
+            }
+
+            const isRealName = document.querySelector('input[name="userType"]:checked').value === "real";
+            const name = isRealName ? (document.getElementById("userName").value.trim() || "익명") : "익명";
+            const email = isRealName ? (document.getElementById("userEmail").value.trim() || "없음") : "없음";
+
+            btn.innerText = "답변 생성 중...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        question: question
+                    })
+                });
+
+                const result = await response.json();
+
+                // 서버에서 에러를 보냈을 경우 상세 원인 표시
+                if (result.status === "error") {
+                    alert("오류 원인: " + result.message);
+                    return;
+                }
+                
+                if (!result.answer) {
+                    alert("답변을 받지 못했습니다. 서버 응답: " + JSON.stringify(result));
+                    return;
+                }
+
+                // 질문과 답변을 화면에 출력
+                displayMessage(name, question, result.answer);
+
+            } catch (error) {
+                alert("통신 오류가 발생했습니다: " + error.message);
+                console.error(error);
+            } finally {
+                questionInput.value = "";
+                btn.innerText = "질문하기";
+                btn.disabled = false;
+            }
+        }
+
+        function displayMessage(name, question, answer) {
+            const chatLog = document.getElementById("chatLog");
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message";
+            
+            const qDiv = document.createElement("div");
+            qDiv.className = "question-text";
+            qDiv.textContent = `[${name}님의 질문] ${question}`;
+            
+            const aDiv = document.createElement("div");
+            aDiv.className = "answer-text";
+            aDiv.textContent = answer;
+
+            msgDiv.appendChild(qDiv);
+            msgDiv.appendChild(aDiv);
+            chatLog.prepend(msgDiv); 
+        }
+    </script>
+</body>
+</html>
